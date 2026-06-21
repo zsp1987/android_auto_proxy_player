@@ -1,0 +1,39 @@
+# Gradle files
+.gradle/
+build/
+app/build/
+
+# Local configuration files (contains your SDK path)
+local.properties
+
+# Android Studio / IntelliJ files
+.idea/
+*.iml
+.idea/workspace.xml
+.idea/libraries/
+.idea/caches/
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Gradle signing keys (credentials)
+*.jks
+*.keystore
+*.pk8
+*.pem
+/signing/
+
+# OS/System generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Log files
+*.log
+
+# Crashlytics/Fabric files
+crashlytics/
+crashlytics-build.properties

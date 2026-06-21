@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Permissions required for Media3 playback service and notification listening -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="androidx.car.app.MEDIA_TEMPLATES" />
+    
+    <!-- Needed to launch settings screen directly in some Android versions -->
+    <uses-permission android:name="android.permission.LAUNCH_NOTIFICATION_LISTENER_SETTINGS" tools:node="remove" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AndroidAutoPlayer"
+        tools:targetApi="34">
+
+        <!-- Phone UI Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AndroidAutoPlayer">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 1. Notification Listener Service to grab other apps' media controllers -->
+        <service
+            android:name=".ProxyNotificationListenerService"
+            android:label="Media Proxy Listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- 2. Media Library Service (Media3) for Android Auto Media Player interface integration -->
+        <service
+            android:name=".ProxyMediaLibraryService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!-- 3. Car App Service (Car App Library) for custom lyric screen integration -->
+        <service
+            android:name=".ProxyCarAppService"
+            android:exported="true"
+            tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.MEDIA" />
+            </intent-filter>
+        </service>
+
+        <!-- Declares support for Android Auto and Android Automotive templates -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+        <meta-data
+            android:name="com.android.automotive"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- Declare minimum Car API level required for MediaPlaybackTemplate and custom rendering -->
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="8" />
+
+    </application>
+
+</manifest>
