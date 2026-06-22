@@ -1,5 +1,7 @@
 package com.example.autoplay
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.PlaybackState
@@ -23,6 +25,14 @@ object MediaProxyManager {
     private val _currentLyric = MutableStateFlow<String>("")
     val currentLyric = _currentLyric.asStateFlow()
 
+    private val _availableControllers = MutableStateFlow<List<MediaController>>(emptyList())
+    val availableControllers = _availableControllers.asStateFlow()
+
+    private val _selectedPackageName = MutableStateFlow<String?>("auto")
+    val selectedPackageName = _selectedPackageName.asStateFlow()
+
+    private var sharedPreferences: SharedPreferences? = null
+
     private val controllerCallback = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) {
             _playbackState.value = state
@@ -33,7 +43,43 @@ object MediaProxyManager {
         }
     }
 
-    fun setActiveController(controller: MediaController?) {
+    fun initSharedPrefs(context: Context) {
+        if (sharedPreferences == null) {
+            sharedPreferences = context.getSharedPreferences("proxy_settings", Context.MODE_PRIVATE)
+            val savedPkg = sharedPreferences?.getString("selected_package", "auto") ?: "auto"
+            _selectedPackageName.value = savedPkg
+            updateActiveController()
+        }
+    }
+
+    fun setSelectedPackage(packageName: String?) {
+        val pkg = packageName ?: "auto"
+        _selectedPackageName.value = pkg
+        sharedPreferences?.edit()?.putString("selected_package", pkg)?.apply()
+        updateActiveController()
+    }
+
+    fun setAvailableControllers(controllers: List<MediaController>) {
+        _availableControllers.value = controllers
+        updateActiveController()
+    }
+
+    private fun updateActiveController() {
+        val controllers = _availableControllers.value
+        val selectedPkg = _selectedPackageName.value ?: "auto"
+
+        val target = if (selectedPkg == "auto") {
+            controllers.firstOrNull {
+                it.playbackState?.state == PlaybackState.STATE_PLAYING
+            } ?: controllers.firstOrNull()
+        } else {
+            controllers.firstOrNull { it.packageName == selectedPkg }
+        }
+
+        setActiveController(target)
+    }
+
+    private fun setActiveController(controller: MediaController?) {
         val old = _activeController.value
         if (old?.packageName == controller?.packageName) {
             // If it is the same package, make sure we have active callbacks but don't reset unnecessarily

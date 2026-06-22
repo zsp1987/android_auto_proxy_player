@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.MediaMetadata
+import android.media.session.MediaController
 import android.media.session.PlaybackState
 import android.os.Bundle
 import android.provider.Settings
@@ -13,6 +14,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +37,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
@@ -61,6 +65,7 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        MediaProxyManager.initSharedPrefs(applicationContext)
         setContent {
             ProxyAppTheme {
                 Surface(
@@ -116,6 +121,8 @@ fun DashboardScreen() {
     val metadata by MediaProxyManager.metadata.collectAsState()
     val playbackState by MediaProxyManager.playbackState.collectAsState()
     val lyric by MediaProxyManager.currentLyric.collectAsState()
+    val availableControllers by MediaProxyManager.availableControllers.collectAsState()
+    val selectedPackageName by MediaProxyManager.selectedPackageName.collectAsState()
 
     Column(
         modifier = Modifier
@@ -158,6 +165,15 @@ fun DashboardScreen() {
             exit = fadeOut()
         ) {
             Column {
+                ProxySourceSelector(
+                    context = context,
+                    availableControllers = availableControllers,
+                    selectedPackageName = selectedPackageName ?: "auto",
+                    onSelectPackage = { pkg -> MediaProxyManager.setSelectedPackage(pkg) }
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 if (activeController != null) {
                     ActiveProxyCard(
                         packageName = activeController?.packageName ?: "Unknown",
@@ -167,7 +183,7 @@ fun DashboardScreen() {
                         lyric = lyric
                     )
                 } else {
-                    IdleProxyCard()
+                    IdleProxyCard(context = context, selectedPackageName = selectedPackageName ?: "auto")
                 }
             }
         }
@@ -344,7 +360,7 @@ fun ActiveProxyCard(
 }
 
 @Composable
-fun IdleProxyCard() {
+fun IdleProxyCard(context: Context, selectedPackageName: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -355,19 +371,147 @@ fun IdleProxyCard() {
             modifier = Modifier.padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val appName = if (selectedPackageName != "auto") {
+                remember(selectedPackageName) { getAppName(context, selectedPackageName) }
+            } else {
+                null
+            }
+
             Text(
-                text = "No Active Session",
+                text = if (appName != null) "$appName is Inactive" else "No Active Session",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Open QQ Music (or another music app) on your phone and start playing audio. The proxy will pick it up automatically.",
+                text = if (appName != null) {
+                    "Open $appName on your phone and start playing audio to activate the proxy."
+                } else {
+                    "Open any music app on your phone and start playing audio. The proxy will pick it up automatically."
+                },
                 fontSize = 14.sp,
                 color = Color.LightGray,
                 textAlign = TextAlign.Center
             )
         }
+    }
+}
+
+@Composable
+fun ProxySourceSelector(
+    context: Context,
+    availableControllers: List<MediaController>,
+    selectedPackageName: String,
+    onSelectPackage: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp)
+        ) {
+            Text(
+                text = "Proxy Target",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                text = "Choose which music app to stream to Android Auto",
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
+            )
+
+            // Auto-detect option
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelectPackage("auto") }
+                    .padding(vertical = 8.dp)
+            ) {
+                RadioButton(
+                    selected = selectedPackageName == "auto",
+                    onClick = { onSelectPackage("auto") },
+                    colors = RadioButtonDefaults.colors(selectedColor = LightBlue)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = "Auto-detect active player",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (selectedPackageName == "auto") LightBlue else Color.White
+                    )
+                    Text(
+                        text = "Streams the playing or most recently active player automatically",
+                        fontSize = 12.sp,
+                        color = Color.LightGray
+                    )
+                }
+            }
+
+            if (availableControllers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(Color.DarkGray)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                availableControllers.forEach { controller ->
+                    val pkg = controller.packageName
+                    val appName = remember(pkg) { getAppName(context, pkg) }
+                    val stateVal = controller.playbackState?.state ?: PlaybackState.STATE_NONE
+                    val isPlaying = stateVal == PlaybackState.STATE_PLAYING
+                    val stateText = if (isPlaying) "Playing" else "Paused"
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelectPackage(pkg) }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        RadioButton(
+                            selected = selectedPackageName == pkg,
+                            onClick = { onSelectPackage(pkg) },
+                            colors = RadioButtonDefaults.colors(selectedColor = LightBlue)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = appName,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selectedPackageName == pkg) LightBlue else Color.White
+                            )
+                            Text(
+                                text = "$pkg • $stateText",
+                                fontSize = 12.sp,
+                                color = Color.LightGray
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun getAppName(context: Context, packageName: String): String {
+    return try {
+        val pm = context.packageManager
+        val appInfo = pm.getApplicationInfo(packageName, 0)
+        pm.getApplicationLabel(appInfo).toString()
+    } catch (e: Exception) {
+        packageName
     }
 }
 

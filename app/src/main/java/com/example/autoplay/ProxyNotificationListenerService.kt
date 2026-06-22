@@ -23,6 +23,11 @@ class ProxyNotificationListenerService : NotificationListenerService() {
         updateActiveController(controllers)
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        MediaProxyManager.initSharedPrefs(this)
+    }
+
     override fun onListenerConnected() {
         super.onListenerConnected()
         isConnected = true
@@ -61,19 +66,7 @@ class ProxyNotificationListenerService : NotificationListenerService() {
     }
 
     private fun updateActiveController(controllers: List<MediaController>?) {
-        if (controllers.isNullOrEmpty()) {
-            Log.d(tag, "No active media controllers found")
-            MediaProxyManager.setActiveController(null)
-            return
-        }
-
-        // Find the first media controller that is actively playing
-        val active = controllers.firstOrNull { 
-            it.playbackState?.state == PlaybackState.STATE_PLAYING 
-        } ?: controllers.first() // Fallback to the first one (most recently active)
-
-        Log.d(tag, "Selected active media controller: ${active.packageName}")
-        MediaProxyManager.setActiveController(active)
+        MediaProxyManager.setAvailableControllers(controllers ?: emptyList())
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
