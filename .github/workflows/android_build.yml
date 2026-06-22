@@ -34,6 +34,12 @@ jobs:
     - name: Build Release APK
       run: ./gradlew assembleRelease
 
+    - name: Get Build Tools Version
+      if: github.event_name != 'pull_request'
+      run: |
+        BUILD_TOOLS_VERSION=$(ls $ANDROID_HOME/build-tools/ | tail -n 1)
+        echo "BUILD_TOOLS_VERSION=$BUILD_TOOLS_VERSION" >> $GITHUB_ENV
+
     - name: Sign Android Release
       if: github.event_name != 'pull_request'
       uses: r0adkll/sign-android-release@v1
@@ -44,6 +50,7 @@ jobs:
         alias: ${{ secrets.SIGN_ALIAS }}
         keyStorePassword: ${{ secrets.SIGN_KEYSTORE_PASSWORD }}
         keyPassword: ${{ secrets.SIGN_KEY_PASSWORD }}
+        buildToolsVersion: ${{ env.BUILD_TOOLS_VERSION }}
 
     - name: Create GitHub Release
       if: github.event_name != 'pull_request'
