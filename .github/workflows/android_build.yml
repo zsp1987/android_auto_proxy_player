@@ -15,6 +15,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: default
 
     steps:
     - name: Checkout Source Code
